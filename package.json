@@ -2,7 +2,7 @@
   "name": "react-native-video-player-ui",
   "version": "1.0.0",
   "description": "React Native Video Player UI with full screen support",
-  "main": "index.js",
+  "main": "Player.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

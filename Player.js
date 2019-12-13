@@ -20,12 +20,11 @@ import PropTypes from "prop-types";
 import Video from "react-native-video";
 import Slider from "@react-native-community/slider";
 var { height, width } = Dimensions.get("window");
-// import { print } from "../../utils/commonfun";
 import AnimatedHideView from "react-native-animated-hide-view";
 import Orientation from "react-native-orientation-locker";
 
 let ViewPropTypesVar;
-
+let timeouts = [];
 if (ViewPropTypes) {
   ViewPropTypesVar = ViewPropTypes;
 } else {
@@ -38,10 +37,13 @@ export default class VideoPlayer extends Component {
     this.togglePlay = this.togglePlay.bind(this);
     this.toggleVolume = this.toggleVolume.bind(this);
     this.toggleFullScreen = this.toggleFullScreen.bind(this);
+    this.toggleForward = this.toggleForward.bind(this);
+    this.toggleBackward = this.toggleBackward.bind(this);
+    this.hideShowControls = this.hideShowControls.bind(this);
   }
   get initialState() {
     return {
-      playing: true,
+      playing: this.props.paused,
       muted: false,
       shuffle: false,
       sliding: false,
@@ -62,14 +64,15 @@ export default class VideoPlayer extends Component {
       spinValue: new Animated.Value(0),
       rotate: false,
       spin: null,
-      clearId: ""
+      controlTimer: this.props.controlTimer ? this.props.controlTimer : 5000,
+      forwardTime: this.props.forwardTime,
+      backwardTime: this.props.backwardTime
     };
   }
 
   componentWillMount() {
     Orientation.lockToPortrait();
     // Orientation.addOrientationListener(this._orientationDidChange);
-
     if (Platform.OS === "")
       this.setState({
         statusBarHeight:
@@ -82,8 +85,6 @@ export default class VideoPlayer extends Component {
       this.toggleFullScreen();
     } else {
       this.toggleFullScreen();
-
-      // do something with portrait layout
     }
   };
   componentWillReceiveProps(nextProps) {}
@@ -149,7 +150,6 @@ export default class VideoPlayer extends Component {
 
   onSlidingChange(value) {
     let newPosition = value * this.state.songDuration;
-    console.log("newPosition", newPosition);
     this.refs.audio.seek(newPosition);
     this.setState({ currentTime: newPosition });
   }
@@ -158,16 +158,22 @@ export default class VideoPlayer extends Component {
     this.refs.audio.seek(this.state.currentTime);
     this.setState({ sliding: false });
   }
+  clearAllTimeouts() {
+    for (var i = 0, z = timeouts.length; i < z; i++) clearTimeout(timeouts[i]);
 
+    timeouts = [];
+  }
   toggleFullScreen() {
+    this.clearAllTimeouts();
     this.setState(
       { fullScreen: !this.state.fullScreen, rotate: !this.state.rotate },
       () => {
         if (this.state.fullScreen) {
-          var clearId = setTimeout(() => {
-            this.setState({ isChildVisible: false });
-          }, 5000);
-          this.setState({ clearId: clearId }, () => {});
+          timeouts.push(
+            setTimeout(() => {
+              this.setState({ isChildVisible: false });
+            }, 5000)
+          );
 
           Animated.timing(this.state.spinValue, {
             toValue: 1,
@@ -175,11 +181,7 @@ export default class VideoPlayer extends Component {
             easing: Easing.linear
           }).start();
         } else {
-          clearTimeout(this.state.clearId);
           this.setState({ isChildVisible: true });
-          setTimeout(() => {
-            this.setState({ isChildVisible: true });
-          }, 5000);
 
           Animated.timing(this.state.spinValue, {
             toValue: 0,
@@ -201,25 +203,24 @@ export default class VideoPlayer extends Component {
   }
 
   toggleForward() {
-    this.setState(
-      {
-        currentTime:
-          this.state.currentTime + 10 <= this.state.songDuration
-            ? this.state.currentTime + 10
-            : this.state.currentTime +
-              (this.state.songDuration - this.state.currentTime)
-      },
-      () => {}
-    );
+    let currentTime =
+      this.state.currentTime + this.state.forwardTime <= this.state.songDuration
+        ? this.state.currentTime + this.state.forwardTime
+        : this.state.currentTime +
+          (this.state.songDuration - this.state.currentTime);
+    this.refs.audio.seek(currentTime);
+    this.setState({ currentTime: currentTime }, () => {});
   }
 
   toggleBackward() {
+    let currentTime =
+      this.state.currentTime - this.state.backwardTime >= 0
+        ? this.state.currentTime - this.state.backwardTime
+        : 0;
     this.setState({
-      currentTime:
-        this.state.currentTime - 10 >= 0
-          ? this.state.currentTime - 10
-          : this.state.currentTime - this.state.currentTime
+      currentTime
     });
+    this.refs.audio.seek(currentTime);
   }
   renderButton() {
     let playButton;
@@ -238,11 +239,8 @@ export default class VideoPlayer extends Component {
 
     let forwardButton = (
       <Icon
-        onPress={() => {
-          this.toggleForward();
-        }}
         style={{ marginTop: 20 }}
-        name="forward-10"
+        name="fast-forward"
         size={30}
         color="#999"
       />
@@ -250,11 +248,8 @@ export default class VideoPlayer extends Component {
 
     let backwardButton = (
       <Icon
-        onPress={() => {
-          this.toggleBackward();
-        }}
         style={{ marginTop: 20 }}
-        name="replay-10"
+        name="fast-rewind"
         size={30}
         color="#999"
       />
@@ -262,19 +257,7 @@ export default class VideoPlayer extends Component {
 
     let fullscreenButton = <Icon name="fullscreen" size={30} color="#999" />;
 
-    let fullscreenExitButton = (
-      <Icon name="fullscreen-exit" size={30} color="#999" />
-    );
-
-    let backButton = (
-      <Icon
-        onPress={() => this.toggleBack()}
-        style={{ left: 15 }}
-        name="chevron-left"
-        size={35}
-        color="#999"
-      />
-    );
+    let { showBackward, showForward } = this.props;
 
     return (
       <View style={styles.controls}>
@@ -288,8 +271,6 @@ export default class VideoPlayer extends Component {
                   onValueChange={this.onSlidingChange.bind(this)}
                   minimumTrackTintColor="#851c44"
                   style={styles.slider}
-                  // trackStyle={styles.sliderTrack}
-                  // thumbStyle={styles.sliderThumb}
                   value={this.state.songPercentage}
                 />
               )}
@@ -319,19 +300,27 @@ export default class VideoPlayer extends Component {
                 <Text>{volumeButton}</Text>
               </TouchableOpacity>
             </Animated.View>
-
-            {/* <TouchableOpacity style={[styles.vCntrlBtn]}>
-              <Text>{backwardButton}</Text>
-            </TouchableOpacity> */}
+            {showBackward && (
+              <TouchableOpacity
+                onPress={this.toggleBackward}
+                style={[styles.vCntrlBtn]}
+              >
+                <Text>{backwardButton}</Text>
+              </TouchableOpacity>
+            )}
             <Animated.View style={[styles.vCntrlBtn]}>
               <TouchableOpacity onPress={this.togglePlay}>
                 <Text>{playButton}</Text>
               </TouchableOpacity>
             </Animated.View>
-
-            {/* <TouchableOpacity style={[styles.vCntrlBtn]}>
-              <Text>{forwardButton}</Text>
-            </TouchableOpacity> */}
+            {showForward && (
+              <TouchableOpacity
+                onPress={this.toggleForward}
+                style={[styles.vCntrlBtn]}
+              >
+                <Text>{forwardButton}</Text>
+              </TouchableOpacity>
+            )}
             {this.props.disableFullscreen ? null : (
               <Animated.View style={[styles.vCntrlBtn]}>
                 <TouchableOpacity onPress={this.toggleFullScreen}>
@@ -384,36 +373,29 @@ export default class VideoPlayer extends Component {
       );
     }
 
-    let fullscreenButton = (
-      <Icon
-        style={{ marginTop: 20 }}
-        name="fullscreen"
-        size={30}
-        color="#999"
-      />
-    );
-
     let forwardButton = (
       <Icon
         style={{ marginTop: 20 }}
-        name="forward-10"
+        name="fast-forward"
         size={30}
         color="#999"
       />
     );
 
     let backwardButton = (
-      <Icon style={{ marginTop: 20 }} name="replay-10" size={30} color="#999" />
+      <Icon
+        style={{ marginTop: 20 }}
+        name="fast-rewind"
+        size={30}
+        color="#999"
+      />
     );
 
     let fullscreenExitButton = (
       <Icon name="fullscreen-exit" size={30} color="#999" />
     );
 
-    let backButton = (
-      <Icon style={{}} name="expand-less" size={35} color="#999" />
-    );
-
+    let { showBackward, showForward } = this.props;
     return (
       <AnimatedHideView
         duration={200}
@@ -423,11 +405,9 @@ export default class VideoPlayer extends Component {
         <View
           style={{
             width: 60,
-            // borderColor: "green",
-            // borderWidth: 1,
             alignSelf: "flex-start",
-            justifyContent: "space-around",
             alignItems: "center",
+            justifyContent: "center",
             height: "100%",
             position: "relative",
             zIndex: 99
@@ -438,18 +418,27 @@ export default class VideoPlayer extends Component {
               <Text>{volumeButton}</Text>
             </TouchableOpacity>
           </Animated.View>
-
-          {/* <TouchableOpacity style={[styles.vCntrlBtn, styles.vCntrlBtnFull]}>
-            <Text>{backwardButton}</Text>
-          </TouchableOpacity> */}
+          {showBackward && (
+            <TouchableOpacity
+              onPress={this.toggleBackward}
+              style={[styles.vCntrlBtn, styles.vCntrlBtnFull]}
+            >
+              <Text>{backwardButton}</Text>
+            </TouchableOpacity>
+          )}
           <Animated.View style={[styles.vCntrlBtn, styles.vCntrlBtnFull]}>
             <TouchableOpacity onPress={this.togglePlay}>
               <Text>{playButton}</Text>
             </TouchableOpacity>
           </Animated.View>
-          {/* <TouchableOpacity style={[styles.vCntrlBtn, styles.vCntrlBtnFull]}>
-            <Text>{forwardButton}</Text>
-          </TouchableOpacity> */}
+          {showForward && (
+            <TouchableOpacity
+              onPress={this.toggleForward}
+              style={[styles.vCntrlBtn, styles.vCntrlBtnFull]}
+            >
+              <Text>{forwardButton}</Text>
+            </TouchableOpacity>
+          )}
           <Animated.View style={[styles.vCntrlBtn, styles.vCntrlBtnFull]}>
             <TouchableOpacity onPress={this.toggleFullScreen}>
               <Text>{fullscreenExitButton}</Text>
@@ -486,6 +475,23 @@ export default class VideoPlayer extends Component {
     );
   }
 
+  hideShowControls() {
+    if (this.state.fullScreen) {
+      this.clearAllTimeouts();
+      this.setState({ isChildVisible: !this.state.isChildVisible }, () => {
+        if (this.state.isChildVisible) {
+          timeouts.push(
+            setTimeout(() => {
+              this.setState({
+                isChildVisible: false
+              });
+            }, 5000)
+          );
+        }
+      });
+    }
+  }
+
   render() {
     const spin = this.state.spinValue.interpolate({
       inputRange: [0, 1],
@@ -501,24 +507,10 @@ export default class VideoPlayer extends Component {
     } else {
       songPercentage = 0;
     }
-    let { uri, muted, paused, disableFullscreen, autoplay } = this.props;
-
+    let { videoLink, muted } = this.props;
     return (
       <View style={styles.mainContainer}>
-        <TouchableWithoutFeedback
-          onPress={() => {
-            this.setState(
-              { isChildVisible: !this.state.isChildVisible },
-              () => {
-                if (this.state.isChildVisible) {
-                  setTimeout(() => {
-                    this.setState({ isChildVisible: false });
-                  }, 5000);
-                }
-              }
-            );
-          }}
-        >
+        <TouchableWithoutFeedback onPress={this.hideShowControls}>
           <Animated.View
             style={[
               styles.container,
@@ -532,9 +524,7 @@ export default class VideoPlayer extends Component {
                 }
               >
                 <Video
-                  source={{
-                    uri: uri
-                  }}
+                  source={videoLink}
                   ref="audio"
                   style={[
                     !this.state.fullScreen
@@ -549,7 +539,7 @@ export default class VideoPlayer extends Component {
                   }} // Callback when remote video is buffering
                   volume={muted ? 0 : 1.0}
                   muted={muted}
-                  paused={paused}
+                  paused={this.state.playing}
                   onLoadStart={this.onLoadStart.bind(this)}
                   onLoad={this.onLoad.bind(this)}
                   onProgress={this.setTime.bind(this)}
@@ -578,7 +568,7 @@ export default class VideoPlayer extends Component {
 }
 
 VideoPlayer.propTypes = {
-  uri: Video.propTypes.source,
+  videoLink: Video.propTypes.source,
   autoplay: PropTypes.bool,
   paused: PropTypes.bool,
   muted: PropTypes.bool,
@@ -586,6 +576,11 @@ VideoPlayer.propTypes = {
   loop: PropTypes.bool,
   disableSeek: PropTypes.bool,
   fullScreenOnLongPress: PropTypes.bool,
+  showBackward: PropTypes.bool,
+  showForward: PropTypes.bool,
+  backwardTime: PropTypes.number,
+  forwardTime: PropTypes.number,
+  controlTimer: PropTypes.number,
   theme: PropTypes.string,
   customStyles: PropTypes.shape({
     seekBar: ViewPropTypesVar.style,
@@ -617,7 +612,8 @@ const styles = StyleSheet.create({
       {
         rotateZ: "90deg"
       }
-    ]
+    ],
+    marginVertical: 50
   },
   view: {
     alignItems: "center",
@@ -838,7 +834,6 @@ function formatTime(second) {
     i = parseInt(s / 60);
     s = parseInt(s % 60);
   }
-  // 补零
   let zero = function(v) {
     return v >> 0 < 10 ? "0" + v : v;
   };
