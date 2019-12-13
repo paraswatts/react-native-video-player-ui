@@ -1,0 +1,35 @@
+{
+  "name": "react-native-video-player-ui",
+  "version": "1.0.0",
+  "description": "React Native Video Player UI with full screen support",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paraswatts/react-native-video-player-ui.git"
+  },
+  "keywords": [
+    "react",
+    "native",
+    "video",
+    "player"
+  ],
+  "author": "Paras Watts<paras.watts@gmail.com  >",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/paraswatts/react-native-video-player-ui/issues"
+  },
+  "homepage": "https://github.com/paraswatts/react-native-video-player-ui#readme",
+  "peerDependencies": {
+    "prop-types": "*",
+    "react": "*",
+    "react-native": "*",
+    "@react-native-community/slider": "^2.0.8",
+    "react-native-animated-hide-view": "^1.0.0",
+    "react-native-orientation-locker": "^1.1.7",
+    "react-native-vector-icons": "^6.6.0",
+    "react-native-video": "^5.0.2"
+  }
+}
