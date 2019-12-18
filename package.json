@@ -1,6 +1,6 @@
 {
   "name": "react-native-video-player-ui",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "React Native Video Player UI with full screen support",
   "main": "Player.js",
   "scripts": {

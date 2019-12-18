@@ -43,7 +43,7 @@ export default class VideoPlayer extends Component {
   }
   get initialState() {
     return {
-      playing: this.props.paused,
+      playing: this.props.paused ? !this.props.paused : true,
       muted: false,
       shuffle: false,
       sliding: false,
