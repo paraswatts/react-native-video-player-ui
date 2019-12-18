@@ -1,5 +1,3 @@
-# react-native-video-player-ui
-
 # React Native Video Player UI
 
 A React Native video player with a few controls. This player uses
